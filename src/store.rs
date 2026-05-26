@@ -7,6 +7,9 @@ pub fn get_counter_path() -> &'static Path {
 pub fn get_current_note_path() -> &'static Path {
 	Path::new("data/metadata/CURRENT_NOTE")
 }
+pub fn get_notes_path() -> &'static Path {
+	Path::new("data/objects-store")
+}
 
 pub fn recreate_data_folder() {
 	let p_data = Path::new("data");
@@ -29,7 +32,7 @@ pub fn recreate_data_folder() {
 	}
 }
 
-pub fn get_counter() -> usize {
+fn get_counter_() -> usize {
 	std::fs::read_to_string(get_counter_path())
 		.unwrap()
 		.trim_ascii()
@@ -37,7 +40,7 @@ pub fn get_counter() -> usize {
 		.unwrap()
 }
 
-pub fn set_counter(new_counter: usize) {
+fn set_counter(new_counter: usize) {
 	std::fs::write(
 		get_counter_path(),
 		new_counter
@@ -45,4 +48,10 @@ pub fn set_counter(new_counter: usize) {
 			.as_bytes(),
 	)
 		.unwrap()
+}
+
+pub fn get_counter() -> usize {
+	let tmp = get_counter_();
+	set_counter(tmp + 1);
+	tmp
 }

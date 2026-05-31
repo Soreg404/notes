@@ -86,6 +86,8 @@ fn main() {
 				.arg("/c")
 				.arg("vim")
 				.arg(store::get_edit_note_path())
+				.arg("-c")
+				.arg("1")
 				.status()
 				.unwrap();
 

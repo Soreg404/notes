@@ -1,7 +1,6 @@
+use std::io::IsTerminal;
 use crate::store::{get_counter, get_notes_path};
 use std::fs::read_dir;
-use std::io::{IsTerminal, Read, Write};
-use std::path::Path;
 
 mod store;
 
@@ -74,7 +73,7 @@ fn main() {
 			let t_fmt = t.format("%Y-%m-%d %H:%M:%S %Z");
 
 			std::fs::write(
-				store::get_current_note_path(),
+				store::get_edit_note_path(),
 				format!("\n\n\n\n\
 					# Adding new note.\n\
 					# Lines starting with '#' are comments.\n\
@@ -86,12 +85,12 @@ fn main() {
 			std::process::Command::new("cmd")
 				.arg("/c")
 				.arg("vim")
-				.arg(store::get_current_note_path())
+				.arg(store::get_edit_note_path())
 				.status()
 				.unwrap();
 
 			let note = std::fs::read_to_string(
-				store::get_current_note_path()
+				store::get_edit_note_path()
 			)
 				.unwrap();
 

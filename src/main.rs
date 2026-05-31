@@ -76,7 +76,7 @@ fn main() {
 				store::get_edit_note_path(),
 				format!("\n\n\n\n\
 					# Adding new note.\n\
-					# Lines starting with '#' are comments.\n\
+					# Lines starting with '#' will be ignored.\n\
 					# Empty note aborts operation.\n\
 					# time: {t_fmt}").as_bytes(),
 			)

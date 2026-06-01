@@ -134,7 +134,7 @@ fn main() {
 
 				let filename = p.file_name().unwrap().to_str().unwrap();
 
-				println!("Note {}", filename);
+				println!("Note \x1b[33m{}\x1b[0m", filename);
 				let mut skip_first = true;
 				let mut n_empty_lines = 0;
 				let mut line_counter = 0;

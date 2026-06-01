@@ -125,7 +125,7 @@ fn main() {
 			}
 		}
 		ConfAction::List => {
-			let mut d = read_dir(get_notes_path()).unwrap();
+			let d = read_dir(get_notes_path()).unwrap();
 			for p in d {
 				let p = p.unwrap();
 				let p = p.path();

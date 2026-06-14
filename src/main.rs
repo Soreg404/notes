@@ -1,8 +1,9 @@
-use std::io::IsTerminal;
-use crate::store::{get_counter, get_notes_path};
+use std::io::IsTerminal; use crate::store::{get_counter, get_notes_path};
 use std::fs::read_dir;
 use chrono::Utc;
 use chrono::DateTime;
+use std::io::Write;
+use std::ffi::OsStr;
 
 mod store;
 
@@ -11,6 +12,7 @@ struct Conf {
     slim: bool,
 }
 
+#[derive(PartialEq, Eq)]
 enum ConfAction {
     Create,
     List,
@@ -86,156 +88,168 @@ fn main() {
 
     store::recreate_data_folder();
 
-    match conf.action {
-        ConfAction::Create => {
-            let t = chrono::Local::now();
-            let t_fmt = t.format("%Y-%m-%d %H:%M:%S %Z");
 
-            std::fs::write(
-                store::get_edit_note_path(),
-                format!("\n\n\n\n\
-                    # Adding new note.\n\
-                    # Lines starting with '#' will be ignored.\n\
-                    # Empty note aborts operation.\n\
-                    # time: {t_fmt}").as_bytes(),
-            )
-                .unwrap();
+    if conf.action == ConfAction::Create {
+        let t = chrono::Local::now();
+        let t_fmt = t.format("%Y-%m-%d %H:%M:%S %Z");
 
-            std::process::Command::new("cmd")
-                .arg("/c")
-                .arg("vim")
-                .arg(store::get_edit_note_path())
-                .arg("-c")
-                .arg("1")
-                .status()
-                .unwrap();
+        std::fs::write(
+            store::get_edit_note_path(),
+            format!("\n\n\n\n\
+                # Adding new note.\n\
+                # Lines starting with '#' will be ignored.\n\
+                # Empty note aborts operation.\n\
+                # time: {t_fmt}").as_bytes(),
+        )
+            .unwrap();
 
-            let note = std::fs::read_to_string(
-                store::get_edit_note_path()
-            )
-                .unwrap();
 
-            let mut note_lines = Vec::new();
-            let mut is_empty_note = true;
-            for line in note.lines() {
-                let line = line.trim();
-                if line.starts_with("#") {
-                    continue;
-                }
-                if is_empty_note && !line.is_empty() {
-                    is_empty_note = false;
-                }
-                note_lines.push(line);
+        create_editor_proc(store::get_edit_note_path());
+        let note = std::fs::read_to_string(
+            store::get_edit_note_path()
+        )
+            .unwrap();
+
+        let mut note_lines = Vec::new();
+        let mut is_empty_note = true;
+        for line in note.lines() {
+            let line = line.trim();
+            if line.starts_with("#") {
+                continue;
             }
+            if is_empty_note && !line.is_empty() {
+                is_empty_note = false;
+            }
+            note_lines.push(line);
+        }
 
-            if !is_empty_note {
-                let note = note_lines.join("\n");
+        if !is_empty_note {
+            let note = note_lines.join("\n");
 
-                let counter = get_counter();
-                let new_note_name = format!("{counter:05}.md");
-                let new_note_path = get_notes_path().join(new_note_name);
+            let counter = get_counter();
+            let new_note_name = format!("{counter:05}.md");
+            let new_note_path = get_notes_path().join(new_note_name);
 
-                if let Err(e) = std::fs::write(new_note_path, note) {
-                    exit_error(&format!("Failed to create new note!\nError: {e}"), -1);
-                }
+            if let Err(e) = std::fs::write(new_note_path, note) {
+                exit_error(&format!("Failed to create new note!\nError: {e}"), -1);
             }
         }
-        ConfAction::List => {
+    } else {
+        let mut pager_proc = create_pager_proc();
+        let mut pager_stdin = pager_proc.stdin.take().unwrap();
 
-            let d = read_dir(get_notes_path()).unwrap();
-            for p in d {
-                let p = p.unwrap();
-                let p = p.path();
-                let note = std::fs::read_to_string(&p)
-                    .unwrap();
+        match conf.action {
+            ConfAction::Create => unreachable!(),
+            ConfAction::List => {
+                let d = read_dir(get_notes_path()).unwrap();
 
-                let filename = p.file_name().unwrap().to_str().unwrap();
+                let mut note_paths = Vec::new();
+                for p in d {
+                    note_paths.push(p.unwrap());
+                }
+
+                for p in note_paths.iter().rev() {
+                }
+
+
+                /*
+                for p in d {
+                    let p = p.unwrap();
+                    let p = p.path();
+                    let note = std::fs::read_to_string(&p)
+                        .unwrap();
+
+                    let filename = p.file_name().unwrap().to_str().unwrap();
+                    let filedate = {
+                        let secs = std::fs::metadata(&p).unwrap().modified().unwrap()
+                            .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+                        chrono::DateTime::<Utc>::from_timestamp_secs(secs as i64).unwrap()
+                    };
+
+                    let date_relative_str = date_relative(&filedate);
+
+                    if conf.slim {
+                        let title = get_note_title(&note);
+                        let date_fmt = filedate.format("%Y-%m-%d");
+                        let num_days = -(Utc::now() - filedate).num_days();
+                        writeln!(pager_stdin, "{filename} {date_fmt} {num_days:4} \x1b[33m|\x1b[0m {title}");
+                    } else {
+                        writeln!(pager_stdin, "{filename} {} ({date_relative_str})", filedate.format("%Y-%m-%d %H:%M:%S"));
+                        let mut skip_first = true;
+                        let mut n_empty_lines = 0;
+                        let mut line_counter = 1;
+                        for line in note.lines() {
+                            if line.trim().is_empty() {
+                                if skip_first {
+                                    line_counter += 1;
+                                    continue;
+                                }
+
+                                n_empty_lines += 1;
+                                continue;
+                            } else {
+                                skip_first = false;
+                                while n_empty_lines > 0 {
+                                    writeln!(pager_stdin, "  {line_counter:4} \x1b[33m|\x1b[0m");
+                                    line_counter += 1;
+                                    n_empty_lines -= 1;
+                                }
+                            }
+                            writeln!(pager_stdin, "  {line_counter:4} \x1b[33m|\x1b[0m {line}");
+                            line_counter += 1;
+                        }
+                        writeln!(pager_stdin);
+                    }
+                }
+                */
+            }
+            ConfAction::Show(n) => {
+                let note_name = format!("{n:05}.md");
+                let filename = get_notes_path().join(&note_name);         
                 let filedate = {
-                    let secs = std::fs::metadata(&p).unwrap().modified().unwrap()
+                    let secs = std::fs::metadata(&filename).unwrap().modified().unwrap()
                         .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
                     chrono::DateTime::<Utc>::from_timestamp_secs(secs as i64).unwrap()
                 };
-
                 let date_relative_str = date_relative(&filedate);
 
-                if conf.slim {
-                    let title = get_note_title(&note);
-                    let date_fmt = filedate.format("%Y-%m-%d");
-                    let num_days = -(Utc::now() - filedate).num_days();
-                    println!("{filename} {date_fmt} {num_days:4} \x1b[33m|\x1b[0m {title}");
-                } else {
-                    println!("{filename} {} ({date_relative_str})", filedate.format("%Y-%m-%d %H:%M:%S"));
-                    let mut skip_first = true;
-                    let mut n_empty_lines = 0;
-                    let mut line_counter = 1;
-                    for line in note.lines() {
-                        if line.trim().is_empty() {
-                            if skip_first {
-                                line_counter += 1;
-                                continue;
-                            }
+                let note = match std::fs::read_to_string(filename){
+                    Err(_) => {
+                        exit_error(&format!("failed to read note {n}"), -2);
+                    }
+                    Ok(v) => v
+                };
 
-                            n_empty_lines += 1;
+                writeln!(pager_stdin, "{note_name} {} ({date_relative_str})", filedate.format("%Y-%m-%d %H:%M:%S"));
+                let mut skip_first = true;
+                let mut n_empty_lines = 0;
+                let mut line_counter = 1;
+                for line in note.lines() {
+                    if line.trim().is_empty() {
+                        if skip_first {
+                            line_counter += 1;
                             continue;
-                        } else {
-                            skip_first = false;
-                            while n_empty_lines > 0 {
-                                println!("  {line_counter:4} \x1b[33m|\x1b[0m");
-                                line_counter += 1;
-                                n_empty_lines -= 1;
-                            }
                         }
-                        println!("  {line_counter:4} \x1b[33m|\x1b[0m {line}");
-                        line_counter += 1;
-                    }
-                    println!();
-                }
-            }
-        }
-        ConfAction::Show(n) => {
 
-            let note_name = format!("{n:05}.md");
-            let filename = get_notes_path().join(&note_name);         
-            let filedate = {
-                let secs = std::fs::metadata(&filename).unwrap().modified().unwrap()
-                    .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
-                chrono::DateTime::<Utc>::from_timestamp_secs(secs as i64).unwrap()
-            };
-            let date_relative_str = date_relative(&filedate);
-
-            let note = match std::fs::read_to_string(filename){
-                Err(_) => {
-                    exit_error(&format!("failed to read note {n}"), -2);
-                }
-                Ok(v) => v
-            };
-
-            println!("{note_name} {} ({date_relative_str})", filedate.format("%Y-%m-%d %H:%M:%S"));
-            let mut skip_first = true;
-            let mut n_empty_lines = 0;
-            let mut line_counter = 1;
-            for line in note.lines() {
-                if line.trim().is_empty() {
-                    if skip_first {
-                        line_counter += 1;
+                        n_empty_lines += 1;
                         continue;
+                    } else {
+                        skip_first = false;
+                        while n_empty_lines > 0 {
+                            writeln!(pager_stdin, "  {line_counter:4} \x1b[33m|\x1b[0m");
+                            line_counter += 1;
+                            n_empty_lines -= 1;
+                        }
                     }
-
-                    n_empty_lines += 1;
-                    continue;
-                } else {
-                    skip_first = false;
-                    while n_empty_lines > 0 {
-                        println!("  {line_counter:4} \x1b[33m|\x1b[0m");
-                        line_counter += 1;
-                        n_empty_lines -= 1;
-                    }
+                    writeln!(pager_stdin, "  {line_counter:4} \x1b[33m|\x1b[0m {line}");
+                    line_counter += 1;
                 }
-                println!("  {line_counter:4} \x1b[33m|\x1b[0m {line}");
-                line_counter += 1;
+                writeln!(pager_stdin);
             }
-            println!();
         }
+
+        drop(pager_stdin);
+        pager_proc.wait();
     }
 }
 
@@ -265,4 +279,29 @@ fn date_relative(datetime: &DateTime<Utc>) -> String {
     } else {
         format!("{} year(s) ago", time_diff.num_days() / 365)
     }
+}
+
+
+fn create_pager_proc() -> std::process::Child {
+    std::process::Command::new("cmd")
+        .arg("/c")
+        .arg("less")
+        .arg("-RFS")
+        .stdout(std::process::Stdio::inherit())
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+        .unwrap()
+}
+
+fn create_editor_proc(input_edit: impl AsRef<OsStr>) -> std::process::Child {
+    std::process::Command::new("cmd")
+        .arg("/c")
+        .arg("vim")
+        .arg(input_edit)
+        .arg("-c")
+        .arg("1")
+        .stdin(std::process::Stdio::inherit())
+        .stdout(std::process::Stdio::inherit())
+        .spawn()
+        .unwrap()
 }

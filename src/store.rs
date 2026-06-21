@@ -4,7 +4,7 @@ use std::path::Path;
 pub fn get_counter_path() -> &'static Path {
 	Path::new("data/metadata/COUNTER")
 }
-pub fn get_current_note_path() -> &'static Path {
+pub fn get_edit_note_path() -> &'static Path {
 	Path::new("data/metadata/CURRENT_NOTE")
 }
 pub fn get_notes_path() -> &'static Path {
@@ -24,8 +24,8 @@ pub fn recreate_data_folder() {
 	if !get_counter_path().is_file() {
 		std::fs::write(get_counter_path(), b"0").unwrap();
 	}
-	if !get_current_note_path().is_file() {
-		std::fs::write(get_current_note_path(), b"").unwrap();
+	if !get_edit_note_path().is_file() {
+		std::fs::write(get_edit_note_path(), b"").unwrap();
 	}
 	if !p_objects_store.is_dir() {
 		std::fs::create_dir(p_objects_store).unwrap();

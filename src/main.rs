@@ -4,6 +4,7 @@ use chrono::Utc;
 use chrono::DateTime;
 use std::io::Write;
 use std::ffi::OsStr;
+use std::process::exit;
 
 mod store;
 
@@ -42,7 +43,7 @@ fn pause() {
 fn exit_error(text: &str, code: i32) -> ! {
     eprintln!("{text}");
     pause();
-    std::process::exit(code);
+    exit(code);
 }
 
 fn main() {
@@ -95,35 +96,59 @@ fn main() {
 
         std::fs::write(
             store::get_edit_note_path(),
-            format!("\n\n\n\n\
-                # Adding new note.\n\
-                # Lines starting with '#' will be ignored.\n\
-                # Empty note aborts operation.\n\
-                # time: {t_fmt}").as_bytes(),
+            format!("\n\n\
+                <!--\n\
+                Adding new note.\n\
+                Comments are ignored and stripped.\n\
+                Empty note aborts operation.\n\
+                time: {t_fmt}\n\
+                -->").as_bytes(),
         )
             .unwrap();
 
-
-        create_editor_proc(store::get_edit_note_path());
+        create_editor_proc(store::get_edit_note_path())
+            .wait();
         let note = std::fs::read_to_string(
             store::get_edit_note_path()
         )
             .unwrap();
 
+        let note = {
+            let mut tmp = Vec::<u8>::new();
+            let note: &[u8] = note.as_bytes();
+            let mut i = 0;
+            let mut in_comment = false;
+            while i < note.len() {
+                let s = &note[i..];
+                if in_comment && s.starts_with(b"-->") {
+                    in_comment = false;
+                    i += 3;
+                    continue;
+                } else if !in_comment && s.starts_with(b"<!--") {
+                    in_comment = true;
+                    i += 4;
+                    continue;
+                } else if !in_comment {
+                    tmp.push(note[i]);
+                }
+                i += 1;
+            }
+            String::from_utf8_lossy(&tmp).to_string()
+        };
+
         let mut note_lines = Vec::new();
         let mut is_empty_note = true;
         for line in note.lines() {
-            let line = line.trim();
-            if line.starts_with("#") {
-                continue;
-            }
-            if is_empty_note && !line.is_empty() {
+            if is_empty_note && !line.trim().is_empty() {
                 is_empty_note = false;
             }
-            note_lines.push(line);
+            note_lines.push(line.trim_end());
         }
 
-        if !is_empty_note {
+        if is_empty_note {
+            eprintln!("Empty note, aborting.");
+            exit(10);
+        } else {
             let note = note_lines.join("\n");
 
             let counter = get_counter();
@@ -149,12 +174,6 @@ fn main() {
                 }
 
                 for p in note_paths.iter().rev() {
-                }
-
-
-                /*
-                for p in d {
-                    let p = p.unwrap();
                     let p = p.path();
                     let note = std::fs::read_to_string(&p)
                         .unwrap();
@@ -201,7 +220,6 @@ fn main() {
                         writeln!(pager_stdin);
                     }
                 }
-                */
             }
             ConfAction::Show(n) => {
                 let note_name = format!("{n:05}.md");
@@ -298,8 +316,9 @@ fn create_editor_proc(input_edit: impl AsRef<OsStr>) -> std::process::Child {
         .arg("/c")
         .arg("vim")
         .arg(input_edit)
-        .arg("-c")
-        .arg("1")
+        .arg("-cset nofixeol")
+        .arg("-cset filetype=markdown")
+        .arg("+0")
         .stdin(std::process::Stdio::inherit())
         .stdout(std::process::Stdio::inherit())
         .spawn()

@@ -39,6 +39,9 @@ fn pause() {
         }
         eprint!("\nPress any key to continue...");
         _ = _getch();
+        while _kbhit() != 0 {
+            _ = _getch();
+        }
     }
     eprintln!();
 }

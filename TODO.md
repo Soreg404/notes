@@ -7,3 +7,5 @@ edit: dodałem to i to
 albo
 edit: broken link / zły link
 (notka 28 o spritach ma zły link)
+
+# bug: daty się źle wyświetlają

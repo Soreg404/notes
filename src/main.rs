@@ -1,3 +1,5 @@
+#![deny(unused_must_use)]
+
 use std::io::IsTerminal; use crate::store::{get_counter, get_notes_path};
 use std::fs::read_dir;
 use chrono::Utc;
@@ -5,6 +7,7 @@ use chrono::DateTime;
 use std::io::Write;
 use std::ffi::OsStr;
 use std::process::exit;
+use std::path::{Path, PathBuf};
 
 mod store;
 
@@ -94,8 +97,15 @@ fn main() {
         let t = chrono::Local::now();
         let t_fmt = t.format("%Y-%m-%d %H:%M:%S %Z");
 
+        let note_draft_path = {
+            let note_num = store::get_counter();
+            let note_draft_name = format!("{note_num:05}.draft");
+            Path::new("data/drafts/").join(note_draft_name)
+        };
+        let note_draft_path = &note_draft_path;
+
         std::fs::write(
-            store::get_edit_note_path(),
+            note_draft_path,
             format!("\n\n\
                 <!--\n\
                 Adding new note.\n\
@@ -106,10 +116,11 @@ fn main() {
         )
             .unwrap();
 
-        create_editor_proc(store::get_edit_note_path())
-            .wait();
+        create_editor_proc(note_draft_path)
+            .wait()
+            .unwrap();
         let note = std::fs::read_to_string(
-            store::get_edit_note_path()
+            note_draft_path
         )
             .unwrap();
 
@@ -147,17 +158,25 @@ fn main() {
 
         if is_empty_note {
             eprintln!("Empty note, aborting.");
+            std::fs::remove_file(note_draft_path)
+                .unwrap();
             exit(10);
         } else {
             let note = note_lines.join("\n");
 
-            let counter = get_counter();
-            let new_note_name = format!("{counter:05}.md");
-            let new_note_path = get_notes_path().join(new_note_name);
+            let note_name = {
+                let mut tmp = PathBuf::from(note_draft_path.file_stem().unwrap());
+                tmp.set_extension("md");
+                tmp
+            };
+            std::fs::write(
+                Path::new("data/objects-store/").join(note_name),
+                note
+            )
+                .unwrap();
 
-            if let Err(e) = std::fs::write(new_note_path, note) {
-                exit_error(&format!("Failed to create new note!\nError: {e}"), -1);
-            }
+            std::fs::remove_file(note_draft_path)
+                .unwrap();
         }
     } else {
         let mut pager_proc = create_pager_proc();
@@ -191,9 +210,9 @@ fn main() {
                         let title = get_note_title(&note);
                         let date_fmt = filedate.format("%Y-%m-%d");
                         let num_days = -(Utc::now() - filedate).num_days();
-                        writeln!(pager_stdin, "{filename} {date_fmt} {num_days:4} \x1b[33m|\x1b[0m {title}");
+                        _ = writeln!(pager_stdin, "{filename} {date_fmt} {num_days:4} \x1b[33m|\x1b[0m {title}");
                     } else {
-                        writeln!(pager_stdin, "{filename} {} ({date_relative_str})", filedate.format("%Y-%m-%d %H:%M:%S"));
+                        _ = writeln!(pager_stdin, "{filename} {} ({date_relative_str})", filedate.format("%Y-%m-%d %H:%M:%S"));
                         let mut skip_first = true;
                         let mut n_empty_lines = 0;
                         let mut line_counter = 1;
@@ -209,15 +228,15 @@ fn main() {
                             } else {
                                 skip_first = false;
                                 while n_empty_lines > 0 {
-                                    writeln!(pager_stdin, "  {line_counter:4} \x1b[33m|\x1b[0m");
+                                    _ = writeln!(pager_stdin, "  {line_counter:4} \x1b[33m|\x1b[0m");
                                     line_counter += 1;
                                     n_empty_lines -= 1;
                                 }
                             }
-                            writeln!(pager_stdin, "  {line_counter:4} \x1b[33m|\x1b[0m {line}");
+                            _ = writeln!(pager_stdin, "  {line_counter:4} \x1b[33m|\x1b[0m {line}");
                             line_counter += 1;
                         }
-                        writeln!(pager_stdin);
+                        _ = writeln!(pager_stdin);
                     }
                 }
             }
@@ -238,7 +257,7 @@ fn main() {
                     Ok(v) => v
                 };
 
-                writeln!(pager_stdin, "{note_name} {} ({date_relative_str})", filedate.format("%Y-%m-%d %H:%M:%S"));
+                _ = writeln!(pager_stdin, "{note_name} {} ({date_relative_str})", filedate.format("%Y-%m-%d %H:%M:%S"));
                 let mut skip_first = true;
                 let mut n_empty_lines = 0;
                 let mut line_counter = 1;
@@ -254,20 +273,22 @@ fn main() {
                     } else {
                         skip_first = false;
                         while n_empty_lines > 0 {
-                            writeln!(pager_stdin, "  {line_counter:4} \x1b[33m|\x1b[0m");
+                            _ = writeln!(pager_stdin, "  {line_counter:4} \x1b[33m|\x1b[0m");
                             line_counter += 1;
                             n_empty_lines -= 1;
                         }
                     }
-                    writeln!(pager_stdin, "  {line_counter:4} \x1b[33m|\x1b[0m {line}");
+                    _ = writeln!(pager_stdin, "  {line_counter:4} \x1b[33m|\x1b[0m {line}");
                     line_counter += 1;
                 }
-                writeln!(pager_stdin);
+                _ = writeln!(pager_stdin);
             }
         }
 
         drop(pager_stdin);
-        pager_proc.wait();
+        pager_proc
+            .wait()
+            .unwrap();
     }
 }
 
@@ -311,7 +332,7 @@ fn create_pager_proc() -> std::process::Child {
         .unwrap()
 }
 
-fn create_editor_proc(input_edit: impl AsRef<OsStr>) -> std::process::Child {
+fn create_editor_proc(input_edit: &Path) -> std::process::Child {
     std::process::Command::new("cmd")
         .arg("/c")
         .arg("vim")

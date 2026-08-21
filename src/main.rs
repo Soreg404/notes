@@ -1,19 +1,22 @@
 #![deny(unused_must_use)]
 
-use std::io::IsTerminal; use crate::store::{get_counter, get_notes_path};
+use std::io::IsTerminal;
+use crate::store::{get_notes_path};
 use std::fs::read_dir;
 use chrono::Utc;
 use chrono::DateTime;
 use std::io::Write;
-use std::ffi::OsStr;
 use std::process::exit;
 use std::path::{Path, PathBuf};
 
 mod store;
+mod browser_open;
 
+// todo: redo conf args
 struct Conf {
     action: ConfAction,
     slim: bool,
+    browser_open: bool,
 }
 
 #[derive(PartialEq, Eq)]
@@ -39,6 +42,9 @@ fn pause() {
         }
         eprint!("\nPress any key to continue...");
         _ = _getch();
+        while _kbhit() != 0 {
+            _ = _getch();
+        }
     }
     eprintln!();
 }
@@ -53,7 +59,8 @@ fn main() {
 
     let mut conf = Conf {
         action: ConfAction::Create,
-        slim: false
+        slim: false,
+        browser_open: true,
     };
 
     let mut args_it = std::env::args().skip(1);
@@ -70,6 +77,9 @@ fn main() {
                     }
                     "-s" | "--slim" => {
                         conf.slim = true;
+                    }
+                    "-b" | "--browser" => {
+                        conf.browser_open = true;
                     }
                     s => {
                         if s.starts_with("-n=") {
@@ -243,45 +253,59 @@ fn main() {
             ConfAction::Show(n) => {
                 let note_name = format!("{n:05}.md");
                 let filename = get_notes_path().join(&note_name);         
-                let filedate = {
-                    let secs = std::fs::metadata(&filename).unwrap().modified().unwrap()
-                        .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
-                    chrono::DateTime::<Utc>::from_timestamp_secs(secs as i64).unwrap()
-                };
-                let date_relative_str = date_relative(&filedate);
 
-                let note = match std::fs::read_to_string(filename){
-                    Err(_) => {
-                        exit_error(&format!("failed to read note {n}"), -2);
-                    }
-                    Ok(v) => v
-                };
-
-                _ = writeln!(pager_stdin, "{note_name} {} ({date_relative_str})", filedate.format("%Y-%m-%d %H:%M:%S"));
-                let mut skip_first = true;
-                let mut n_empty_lines = 0;
-                let mut line_counter = 1;
-                for line in note.lines() {
-                    if line.trim().is_empty() {
-                        if skip_first {
-                            line_counter += 1;
-                            continue;
+                let mut proceed_show = true;
+                if conf.browser_open {
+                    match browser_open::open(&filename) {
+                        Ok(()) => { proceed_show = false } 
+                        _ => {
+                            _ = writeln!(pager_stdin,
+                                "couldn't open note {filename:?} in browser");
                         }
-
-                        n_empty_lines += 1;
-                        continue;
-                    } else {
-                        skip_first = false;
-                        while n_empty_lines > 0 {
-                            _ = writeln!(pager_stdin, "  {line_counter:4} \x1b[33m|\x1b[0m");
-                            line_counter += 1;
-                            n_empty_lines -= 1;
-                        }
-                    }
-                    _ = writeln!(pager_stdin, "  {line_counter:4} \x1b[33m|\x1b[0m {line}");
-                    line_counter += 1;
+                    };
                 }
-                _ = writeln!(pager_stdin);
+
+                if proceed_show {
+                    let filedate = {
+                        let secs = std::fs::metadata(&filename).unwrap().modified().unwrap()
+                            .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+                        chrono::DateTime::<Utc>::from_timestamp_secs(secs as i64).unwrap()
+                    };
+                    let date_relative_str = date_relative(&filedate);
+
+                    let note = match std::fs::read_to_string(filename){
+                        Err(_) => {
+                            exit_error(&format!("failed to read note {n}"), -2);
+                        }
+                        Ok(v) => v
+                    };
+
+                    _ = writeln!(pager_stdin, "{note_name} {} ({date_relative_str})", filedate.format("%Y-%m-%d %H:%M:%S"));
+                    let mut skip_first = true;
+                    let mut n_empty_lines = 0;
+                    let mut line_counter = 1;
+                    for line in note.lines() {
+                        if line.trim().is_empty() {
+                            if skip_first {
+                                line_counter += 1;
+                                continue;
+                            }
+
+                            n_empty_lines += 1;
+                            continue;
+                        } else {
+                            skip_first = false;
+                            while n_empty_lines > 0 {
+                                _ = writeln!(pager_stdin, "  {line_counter:4} \x1b[33m|\x1b[0m");
+                                line_counter += 1;
+                                n_empty_lines -= 1;
+                            }
+                        }
+                        _ = writeln!(pager_stdin, "  {line_counter:4} \x1b[33m|\x1b[0m {line}");
+                        line_counter += 1;
+                    }
+                    _ = writeln!(pager_stdin);
+                }
             }
         }
 

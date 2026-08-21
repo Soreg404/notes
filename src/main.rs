@@ -60,7 +60,7 @@ fn main() {
     let mut conf = Conf {
         action: ConfAction::Create,
         slim: false,
-        browser_open: true,
+        browser_open: false,
     };
 
     let mut args_it = std::env::args().skip(1);

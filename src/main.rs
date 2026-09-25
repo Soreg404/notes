@@ -60,7 +60,7 @@ fn main() {
     let mut conf = Conf {
         action: ConfAction::Create,
         slim: false,
-        browser_open: true,
+        browser_open: false,
     };
 
     let mut args_it = std::env::args().skip(1);
@@ -107,12 +107,11 @@ fn main() {
         let t = chrono::Local::now();
         let t_fmt = t.format("%Y-%m-%d %H:%M:%S %Z");
 
-        let note_draft_path = {
+        let note_draft_path = &{
             let note_num = store::get_counter();
-            let note_draft_name = format!("{note_num:05}.draft");
+            let note_draft_name = format!("{note_num:05}.draft.md");
             Path::new("data/drafts/").join(note_draft_name)
         };
-        let note_draft_path = &note_draft_path;
 
         std::fs::write(
             note_draft_path,

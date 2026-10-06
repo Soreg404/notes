@@ -16,3 +16,6 @@ edit: broken link / zły link
 
 # Ignore case in less search (-i)
 [link](https://unix.stackexchange.com/questions/116395/less-searches-are-always-case-insensitive)
+
+# editor cd
+Vim has incorrect working dir -- projecct working dir instead of drafts

@@ -94,7 +94,7 @@ fn main() {
                     }
                 }
                 config::Action::Show { n, browser } => {
-                    let note_name = format!("{n:05}.md");
+                    let note_name = format!("{n:08}.md");
                     let filename = get_notes_path().join(&note_name);         
 
                     if !std::fs::exists(&filename).unwrap() {

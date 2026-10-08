@@ -1,57 +1,113 @@
-use std::io::{Read, Write};
-use std::path::Path;
+use std::{
+    io::{Read, Write},
+    fs::File,
+    path::{
+        Path,
+        PathBuf,
+    },
+};
 
-pub fn get_counter_path() -> &'static Path {
-	Path::new("data/metadata/COUNTER")
-}
-pub fn get_notes_path() -> &'static Path {
-	Path::new("data/objects-store")
+pub fn notes_path() -> &'static Path {
+    &Path::new("data/objects-store")
 }
 
 pub fn recreate_data_folder() {
 	let p_data = Path::new("data");
-	let p_metadata = Path::new("data/metadata");
-    let p_drafts = Path::new("data/drafts");
-	let p_objects_store = Path::new("data/objects-store");
 	if !p_data.is_dir() {
 		std::fs::create_dir(p_data).unwrap();
 	}
+    
+	let p_metadata = Path::new("data/metadata");
 	if !p_metadata.is_dir() {
 		std::fs::create_dir(p_metadata).unwrap();
 	}
+    let p_meta_version = Metadata::Version.as_path_buf();
+	if !p_meta_version.is_file() {
+		std::fs::write(p_meta_version, b"0").unwrap();
+	}
+    let p_meta_counter = Metadata::Counter.as_path_buf();
+	if !p_meta_counter.is_file() {
+		std::fs::write(p_meta_counter, b"0").unwrap();
+	}
+
+    let p_drafts = Path::new("data/drafts");
     if !p_drafts.is_dir() {
 		std::fs::create_dir(p_drafts).unwrap();
     }
-	if !get_counter_path().is_file() {
-		std::fs::write(get_counter_path(), b"0").unwrap();
-	}
+
+	let p_objects_store = Path::new("data/objects-store");
 	if !p_objects_store.is_dir() {
 		std::fs::create_dir(p_objects_store).unwrap();
 	}
 }
 
-pub fn get_counter_string() -> String {
-    format!("{:08}", get_counter())
+#[derive(Copy, Clone)]
+pub enum Metadata {
+    Version,
+    Counter,
+}
+impl Metadata {
+    fn as_path_buf(&self) -> PathBuf {
+        Path::new("data/metadata")
+            .join(match self {
+                Metadata::Version => "VERSION",
+                Metadata::Counter => "COUNTER",
+            })
+    }
 }
 
-fn get_counter() -> usize {
-    use std::io::Seek;
-    let mut counter_file = std::fs::OpenOptions::new()
+pub fn get_version() -> usize {
+    let mut num = 0usize;
+    meta_file_lock(
+        Metadata::Version,
+        |s| {
+            num = s.parse::<usize>().unwrap();
+        }
+    );
+    num
+}
+
+pub fn set_version(ver: usize) {
+    println!("\x1b[93mset new version: {ver}\x1b[0m");
+    std::fs::write(
+        Metadata::Version.as_path_buf().as_path(),
+        ver.to_string(),
+    ).unwrap();
+}
+
+pub fn get_counter_string() -> String {
+    let mut num = 0usize;
+    meta_file_lock(
+        Metadata::Counter,
+        |s| {
+            num = s.parse::<usize>().unwrap();
+            *s = (num + 1).to_string();
+        }
+    );
+    format!("{num:08}")
+}
+
+
+fn meta_file_lock(which: Metadata, func: impl FnOnce(&mut String)) {
+    let p = &which.as_path_buf();
+    let mut file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
-        .open(Path::new("data/metadata/COUNTER"))
+        .open(&p)
         .unwrap();
-    counter_file.lock()
+
+    file.lock()
         .unwrap();
+
     let mut contents = String::new();
-    counter_file.read_to_string(&mut contents)
+    file.read_to_string(&mut contents)
         .unwrap();
-    let contents = contents.trim();
-    let counter = contents.parse::<usize>()
+    let mut contents = contents.trim().to_string();
+
+    func(&mut contents);
+
+    <File as std::io::Seek>::rewind(&mut file)
         .unwrap();
-    counter_file.rewind()
+    file.write_all(contents.as_bytes())
         .unwrap();
-    counter_file.write_all(format!("{}\n", counter + 1).as_bytes())
-        .unwrap();
-    counter
 }

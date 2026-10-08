@@ -6,10 +6,7 @@ use crate::{
     helpers,
 };
 
-use chrono::{
-    DateTime,
-    FixedOffset,
-};
+use chrono::prelude::*;
 
 pub fn edit_note(note_num: &str) {
     let filename = &PathBuf::from(format!("data/objects-store/{note_num}.md"));

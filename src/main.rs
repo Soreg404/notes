@@ -2,15 +2,12 @@
 
 use std::{
     io::Write,
-    fs::read_dir,
+    fs::{
+        read_dir,
+    }
 };
-use crate::store::{get_notes_path};
 
-use chrono::{
-    Utc,
-    DateTime,
-    FixedOffset,
-};
+use chrono::prelude::*;
 
 mod config;
 mod store;
@@ -22,14 +19,15 @@ mod helpers;
 mod create_note;
 mod edit_note;
 
+mod patch_dates_in_note_objects;
+
 fn main() {
     let conf = config::get_app_config();
 
     store::recreate_data_folder();
 
-    if option_env!("PATCH_DATES").is_some() {
-        patch_rewrite_dates_to_note_objects();
-    }
+    check_version();
+
 
     match conf.action {
         config::Action::Create => {
@@ -47,7 +45,7 @@ fn main() {
                 config::Action::Edit(_) => unreachable!(),
                 config::Action::List { slim } => {
                     let mut note_paths = Vec::new();
-                    for p in read_dir(get_notes_path()).unwrap() {
+                    for p in read_dir(store::notes_path()).unwrap() {
                         note_paths.push(p.unwrap());
                     }
 
@@ -96,7 +94,7 @@ fn main() {
                 }
                 config::Action::Show { n, browser } => {
                     let note_name = format!("{n:08}.md");
-                    let filename = get_notes_path().join(&note_name);         
+                    let filename = store::notes_path().join(&note_name);         
 
                     if !std::fs::exists(&filename).unwrap() {
                         proc_exit(Err(format!("note {n} does not exist")));
@@ -174,49 +172,22 @@ fn create_pager_proc() -> std::process::Child {
         .unwrap()
 }
 
-fn patch_rewrite_dates_to_note_objects() -> ! {
-    use std::process::exit;
-
-    println!("\x1b[93mpatch: write filetime dates to all existing notes.\x1b[0m");
+fn check_version() {
     loop {
-        println!("continue? y/N");
-        let mut s = String::new();
-        std::io::stdin().read_line(&mut s).unwrap();
-        match s.trim() {
-            "y" | "Y" => {
-                println!("continue");
-                break;
+        match store::get_version() {
+            0 => {
+                if !patch_dates_in_note_objects::is_applied() {
+                    patch_dates_in_note_objects::patch();
+                    store::set_version(1);
+                    std::process::exit(0);
+                } else {
+                    panic!("version is 0 but patch \
+                \"note dates in note objects\" \
+                is already applied")
+                }
             }
-            "n" | "N" | "" => {
-                println!("cancel");
-                exit(1);
-            }
-            _ => continue
+            1 => break,
+            _ => unreachable!("invalid version")
         }
     }
-    
-
-    for p in read_dir(get_notes_path()).unwrap() {
-        let p = &p.unwrap().path();
-        println!("doing path: {p:?}");
-        let secs = std::fs::metadata(p).unwrap().modified().unwrap()
-            .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
-        let date = DateTime::<Utc>::from_timestamp_secs(
-            secs as i64).unwrap();
-
-        let mut note = match std::fs::read_to_string(p){
-            Err(ioerr) => {
-                eprintln!("failed to read note {p:?}: {ioerr:?}");
-                continue;
-            }
-            Ok(v) => v
-        };
-
-        note = helpers::set_note_date(note, date);
-        println!("  date: {}", DateTime::<FixedOffset>::from(date).to_rfc3339());
-
-        std::fs::write(p, note).unwrap();
-    }
-
-    exit(0)
 }

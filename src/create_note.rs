@@ -7,12 +7,9 @@ use crate::{
     helpers,
 };
 
-use chrono::{
-    DateTime,
-    FixedOffset,
-    Local,
-};
+use chrono::prelude::*;
 
+    
 pub fn create_note() {
     let note_num = store::get_counter_string();
     let note_draft_path = &PathBuf::from(format!("data/drafts/{note_num}.draft.md"));
@@ -79,7 +76,7 @@ pub fn note_from_draft(mut note: String) -> Option<String> {
 
     let mut note = note_lines.join("\n");
 
-    let date = chrono::Local::now().to_utc();
+    let date = Local::now().to_utc();
     note = helpers::set_note_date(note, date);
 
     Some(note)

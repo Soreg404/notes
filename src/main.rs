@@ -348,7 +348,7 @@ fn create_pager_proc() -> std::process::Child {
     std::process::Command::new("cmd")
         .arg("/c")
         .arg("less")
-        .arg("-RFS")
+        .arg("-RFSI")
         .stdout(std::process::Stdio::inherit())
         .stdin(std::process::Stdio::piped())
         .spawn()

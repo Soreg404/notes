@@ -1,3 +1,4 @@
+
 # dodać backupy w zipie
 
 # możliwość edycji notek
@@ -16,3 +17,5 @@ Vim has incorrect working dir -- projecct working dir instead of drafts
 # mby use clap for args...
 
 # refactor `create_note.rs, edit_note.rs i helpers.rs`
+
+# IMPORTANT: daty notatek muszą być W notatce a nie w Windowsie bo Windows dupa

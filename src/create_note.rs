@@ -7,13 +7,14 @@ use crate::{
     helpers,
 };
 
+use chrono::prelude::*;
+
+    
 pub fn create_note() {
-    let t = chrono::Local::now();
-    let t_fmt = t.format("%Y-%m-%d %H:%M:%S %Z");
-
-    let note_num = format!("{:08}", store::get_counter());
-
+    let note_num = store::get_counter_string();
     let note_draft_path = &PathBuf::from(format!("data/drafts/{note_num}.draft.md"));
+
+    let tmp_date = DateTime::<FixedOffset>::from(Local::now().to_utc()).to_rfc3339();
 
     std::fs::write(
         note_draft_path,
@@ -22,24 +23,44 @@ pub fn create_note() {
                 Adding new note.\n\
                 Comments are ignored and stripped.\n\
                 Empty note aborts operation.\n\
-                time: {t_fmt}\n\
+                time: {tmp_date}\n\
                 -->").as_bytes(),
-    )
-        .unwrap();
+    ).unwrap();
 
     helpers::create_editor_proc(note_draft_path)
         .wait()
         .unwrap();
-    let note = match std::fs::read_to_string(
-        note_draft_path
-    ) {
+
+    let note = match std::fs::read_to_string(note_draft_path) {
         Ok(v) => v,
         Err(ioerr) => {
             proc_exit(Err(format!("draft missing, aborting (io error: {ioerr:?})")));
         }
     };
 
-    let note = helpers::strip_html_comments(&note);
+    let note = match note_from_draft(note) {
+        Some(v) => v,
+        None => {
+            std::fs::remove_file(note_draft_path)
+                .unwrap();
+            proc_exit(Err(String::from("Empty note, aborting.")));
+        }
+    };
+
+    let note_name = format!("{note_num}.md");
+    std::fs::write(
+        Path::new("data/objects-store/").join(note_name),
+        note
+    ).unwrap();
+
+    std::fs::remove_file(note_draft_path)
+        .unwrap();
+
+    helpers::git_commit(&note_num, false);
+}
+
+pub fn note_from_draft(mut note: String) -> Option<String> {
+    let note = helpers::strip_html_comments(&mut note);
 
     let mut note_lines = Vec::new();
     let mut is_empty_note = true;
@@ -49,29 +70,14 @@ pub fn create_note() {
         }
         note_lines.push(line.trim_end());
     }
-
     if is_empty_note {
-        std::fs::remove_file(note_draft_path)
-            .unwrap();
-        proc_exit(Err(String::from("Empty note, aborting.")));
-    } else {
-        let note = note_lines.join("\n");
-
-        let note_name = {
-            let mut tmp = PathBuf::from(note_draft_path.file_stem().unwrap());
-            tmp.set_extension("md");
-            tmp
-        };
-        std::fs::write(
-            Path::new("data/objects-store/").join(note_name),
-            note
-        )
-            .unwrap();
-
-        std::fs::remove_file(note_draft_path)
-            .unwrap();
-
-        helpers::git_commit(&note_num, false);
+        return None;
     }
-}
 
+    let mut note = note_lines.join("\n");
+
+    let date = Local::now().to_utc();
+    note = helpers::set_note_date(note, date);
+
+    Some(note)
+}

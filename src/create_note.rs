@@ -11,7 +11,7 @@ pub fn create_note() {
     let t = chrono::Local::now();
     let t_fmt = t.format("%Y-%m-%d %H:%M:%S %Z");
 
-    let note_num = format!("{:05}", store::get_counter());
+    let note_num = format!("{:08}", store::get_counter());
 
     let note_draft_path = &PathBuf::from(format!("data/drafts/{note_num}.draft.md"));
 

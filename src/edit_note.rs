@@ -10,7 +10,7 @@ pub fn edit_note(n: usize) {
     let t = chrono::Local::now();
     let t_fmt = t.format("%Y-%m-%d %H:%M:%S %Z");
 
-    let note_num = format!("{:05}", n);
+    let note_num = format!("{:08}", n);
 
     let filename = &PathBuf::from(format!("data/objects-store/{note_num}.md"));
 

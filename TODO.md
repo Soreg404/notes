@@ -10,5 +10,9 @@ edit: broken link / zły link
 
 # bug: daty się źle wyświetlają
 
-# tweak: draft extension
-`.draft` otwarte w chromie nie działa z wykrywaniem markdowna - powinno być `.draft.md`
+# editor cd
+Vim has incorrect working dir -- projecct working dir instead of drafts
+
+# mby use clap for args...
+
+# refactor `create_note.rs, edit_note.rs i helpers.rs`

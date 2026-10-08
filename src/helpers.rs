@@ -3,11 +3,7 @@ use std::{
     path::Path,
 };
 
-use chrono::{
-    DateTime,
-    FixedOffset,
-    Utc,
-};
+use chrono::prelude::*;
 
 pub fn get_strip_note_date(note: &mut String) -> DateTime<Utc> {
     let date_str = match note.lines().next() {
@@ -28,10 +24,14 @@ pub fn set_note_date(note: String, date: DateTime<Utc>) -> String {
 }
 
 pub fn get_note_title(note: &str) -> &str {
-    note.lines()
-        .skip(1).take(1).next()
-        .map(|v| v.trim())
-        .expect("empty note is not allowed")
+    let mut line = "";
+    for l in note.lines() {
+        if !l.trim().is_empty() {
+            line = l;
+            break;
+        }
+    }
+    line
 }
 
 pub fn date_relative_str(datetime: DateTime<Utc>) -> String {

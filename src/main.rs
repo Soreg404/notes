@@ -56,15 +56,23 @@ fn main() {
                         let filename = p.file_name().unwrap().to_str().unwrap();
 
                         let date = helpers::get_strip_note_date(&mut note);
-                        let date_relative_str = helpers::date_relative_str(date);
+                        let date_local: DateTime<Local> = DateTime::from(date);
+                        let date_relative_str = helpers::date_relative_str(date.to_utc());
 
                         if slim {
                             let title = helpers::get_note_title(&note);
-                            let date_fmt = date.format("%Y-%m-%d");
+                            let date_fmt = date_local.format("%Y-%m-%d");
                             let num_days = -(Utc::now() - date).num_days();
-                            _ = writeln!(pager_stdin, "{filename} {date_fmt} {num_days:4} \x1b[33m|\x1b[0m {title}");
+                            _ = writeln!(
+                                pager_stdin,
+                                "{filename} {date_fmt} {num_days:4} \x1b[33m|\x1b[0m {title}"
+                            );
                         } else {
-                            _ = writeln!(pager_stdin, "{filename} {} ({date_relative_str})", date.format("%Y-%m-%d %H:%M:%S"));
+                            _ = writeln!(
+                                pager_stdin,
+                                "{filename} {} ({date_relative_str})",
+                                date_local.format("%Y-%m-%d %H:%M:%S")
+                            );
                             let mut skip_first = true;
                             let mut n_empty_lines = 0;
                             let mut line_counter = 1;
@@ -120,7 +128,7 @@ fn main() {
                         };
 
                         let date = helpers::get_strip_note_date(&mut note);
-                        let date_relative_str = helpers::date_relative_str(date);
+                        let date_relative_str = helpers::date_relative_str(date.to_utc());
 
                         _ = writeln!(
                             pager_stdin,

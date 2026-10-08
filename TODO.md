@@ -13,3 +13,5 @@ edit: broken link / zły link
 # editor cd
 Vim has incorrect working dir -- projecct working dir instead of drafts
 
+# mby use clap for args...
+

@@ -14,7 +14,9 @@ mod browser_open;
 mod exit_process;
 use exit_process::proc_exit;
 
+mod helpers;
 mod create_note;
+mod edit_note;
 
 fn main() {
     let conf = config::get_app_config();
@@ -25,12 +27,16 @@ fn main() {
         config::Action::Create => {
             create_note::create_note();
         }
+        config::Action::Edit(n) => {
+            edit_note::edit_note(n);
+        }
         action => {
             let mut pager_proc = create_pager_proc();
             let mut pager_stdin = pager_proc.stdin.take().unwrap();
 
             match action {
                 config::Action::Create => unreachable!(),
+                config::Action::Edit(_) => unreachable!(),
                 config::Action::List { slim } => {
                     let d = read_dir(get_notes_path()).unwrap();
 

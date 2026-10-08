@@ -15,3 +15,4 @@ Vim has incorrect working dir -- projecct working dir instead of drafts
 
 # mby use clap for args...
 
+# refactor `create_note.rs, edit_note.rs i helpers.rs`

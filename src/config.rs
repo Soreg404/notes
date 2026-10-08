@@ -13,6 +13,7 @@ pub enum Action {
         n: usize,
         browser: bool,
     },
+    Edit(usize),
 }
 
 pub fn get_app_config() -> AppConfig {
@@ -69,7 +70,21 @@ pub fn get_app_config() -> AppConfig {
                         n,
                         browser: false,
                     };
-                } else {
+                }
+                else if s.starts_with("-e=") || s.starts_with("--edit=") {
+                    let eqpos = s.chars().position(|c| c == '=')
+                        .unwrap();
+                    let arg = s.chars().take(eqpos).collect::<String>();
+                    let num_s = s.chars().skip(eqpos + 1).collect::<String>();
+                    let n = match num_s.parse::<usize>() {
+                        Ok(v) => v,
+                        Err(_) => {
+                            proc_exit(Err(format!("Invalid value for arg {arg}")));
+                        }
+                    };
+                    conf.action = Action::Edit(n);
+                }
+                else {
                     proc_exit(Err(format!("Invalid argument {s:?}")));
                 }
             }

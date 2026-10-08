@@ -4,17 +4,16 @@ use std::{
 use crate::{
     exit_process::proc_exit,
     store,
+    helpers,
 };
 
 pub fn create_note() {
     let t = chrono::Local::now();
     let t_fmt = t.format("%Y-%m-%d %H:%M:%S %Z");
 
-    let note_draft_path = &{
-        let note_num = store::get_counter();
-        let note_draft_name = format!("{note_num:05}.draft.md");
-        Path::new("data/drafts/").join(note_draft_name)
-    };
+    let note_num = format!("{:05}", store::get_counter());
+
+    let note_draft_path = &PathBuf::from(format!("data/drafts/{note_num}.draft.md"));
 
     std::fs::write(
         note_draft_path,
@@ -28,7 +27,7 @@ pub fn create_note() {
     )
         .unwrap();
 
-    create_editor_proc(note_draft_path)
+    helpers::create_editor_proc(note_draft_path)
         .wait()
         .unwrap();
     let note = match std::fs::read_to_string(
@@ -40,7 +39,7 @@ pub fn create_note() {
         }
     };
 
-    let note = strip_html_comments(&note);
+    let note = helpers::strip_html_comments(&note);
 
     let mut note_lines = Vec::new();
     let mut is_empty_note = true;
@@ -71,42 +70,8 @@ pub fn create_note() {
 
         std::fs::remove_file(note_draft_path)
             .unwrap();
+
+        helpers::git_commit(&note_num, false);
     }
 }
 
-fn create_editor_proc(input_edit: &Path) -> std::process::Child {
-    std::process::Command::new("cmd")
-        .arg("/c")
-        .arg("vim")
-        .arg(input_edit)
-        .arg("-cset nofixeol")
-        .arg("-cset filetype=markdown")
-        .arg("+0")
-        .stdin(std::process::Stdio::inherit())
-        .stdout(std::process::Stdio::inherit())
-        .spawn()
-        .unwrap()
-}
-
-fn strip_html_comments(note: &String) -> String {
-    let mut tmp = Vec::<u8>::new();
-    let note = note.as_bytes();
-    let mut i = 0;
-    let mut in_comment = false;
-    while i < note.len() {
-        let s = &note[i..];
-        if in_comment && s.starts_with(b"-->") {
-            in_comment = false;
-            i += 3;
-            continue;
-        } else if !in_comment && s.starts_with(b"<!--") {
-            in_comment = true;
-            i += 4;
-            continue;
-        } else if !in_comment {
-            tmp.push(note[i]);
-        }
-        i += 1;
-    }
-    String::from_utf8_lossy(&tmp).to_string()
-}

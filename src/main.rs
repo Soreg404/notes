@@ -49,20 +49,17 @@ fn main() {
                         let p = p.path();
                         let note = std::fs::read_to_string(&p)
                             .unwrap();
-
                         let filename = p.file_name().unwrap().to_str().unwrap();
-                        let filedate = {
-                            let secs = std::fs::metadata(&p).unwrap().modified().unwrap()
-                                .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
-                            chrono::DateTime::<Utc>::from_timestamp_secs(secs as i64).unwrap()
-                        };
 
-                        let date_relative_str = date_relative(&filedate);
+                        helpers::patch_create_note_date_from_ftime(&mut note, filename);
+
+                        let date = helpers::get_note_date(&mut note);
+                        let date_relative_str = helpers::date_relative_str(&date);
 
                         if slim {
-                            let title = get_note_title(&note);
-                            let date_fmt = filedate.format("%Y-%m-%d");
-                            let num_days = -(Utc::now() - filedate).num_days();
+                            let title = helpers::get_note_title(&note);
+                            let date_fmt = date.format("%Y-%m-%d");
+                            let num_days = -(Utc::now() - date).num_days();
                             _ = writeln!(pager_stdin, "{filename} {date_fmt} {num_days:4} \x1b[33m|\x1b[0m {title}");
                         } else {
                             _ = writeln!(pager_stdin, "{filename} {} ({date_relative_str})", filedate.format("%Y-%m-%d %H:%M:%S"));
@@ -113,19 +110,15 @@ fn main() {
                     }
 
                     if proceed_show {
-                        let filedate = {
-                            let secs = std::fs::metadata(&filename).unwrap().modified().unwrap()
-                                .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
-                            chrono::DateTime::<Utc>::from_timestamp_secs(secs as i64).unwrap()
-                        };
-                        let date_relative_str = date_relative(&filedate);
-
                         let note = match std::fs::read_to_string(filename){
-                            Err(_) => {
-                                proc_exit(Err(format!("failed to read note {n}")));
+                            Err(ioerr) => {
+                                proc_exit(Err(format!("failed to read note {n}: {ioerr:?}")));
                             }
                             Ok(v) => v
                         };
+
+                        let date = helpers::get_note_date(&mut note);
+                        let date_relative_str = date_relative(&filedate);
 
                         _ = writeln!(
                             pager_stdin,
@@ -165,38 +158,6 @@ fn main() {
         }
     }
 }
-
-fn get_note_title(note: &str) -> &str {
-    for line in note.lines() {
-        if !line.trim().is_empty() {
-            return line;
-        }
-    }
-    panic!("empty note is not allowed")
-}
-
-fn date_relative(datetime: &DateTime<Utc>) -> String {
-    let now = Utc::now();
-    let time_diff = now - datetime;
-    if time_diff.num_minutes() < 10 {
-        "just now".to_string()
-    } else if now.date_naive() == datetime.date_naive() {
-        "today".to_string()
-    } else if time_diff.num_days() == 0 {
-        "yesterday".to_string()
-    }
-    else if time_diff.num_days() < 31 {
-        format!("{} days ago", time_diff.num_days() + 1)
-    } else if time_diff.num_days() < 365 {
-        format!("{} month(s) {} day(s) ago", time_diff.num_days() / 30,
-            time_diff.num_days() % 30)
-    } else {
-        format!("{} year(s) {} month(s) {} day(s) ago",
-        time_diff.num_days() / 365, (time_diff.num_days() % 365) / 30,
-        ((time_diff.num_days() % 365) / 30) % 30)
-    }
-}
-
 
 fn create_pager_proc() -> std::process::Child {
     std::process::Command::new("cmd")

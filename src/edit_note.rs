@@ -6,12 +6,13 @@ use crate::{
     helpers,
 };
 
-pub fn edit_note(n: usize) {
-    let t = chrono::Local::now();
-    let t_fmt = t.format("%Y-%m-%d %H:%M:%S %Z");
+use chrono::{
+    DateTime,
+    FixedOffset,
+    Utc,
+};
 
-    let note_num = format!("{:08}", n);
-
+pub fn edit_note(note_num: &str) {
     let filename = &PathBuf::from(format!("data/objects-store/{note_num}.md"));
 
     let note = match std::fs::read_to_string(filename) {
@@ -20,10 +21,10 @@ pub fn edit_note(n: usize) {
             proc_exit(Err(format!("\x1b[91mnote missing!!\x1b[0m aborting (io error: {ioerr:?})")));
         }
     };
+    let note = note.lines().skip(1).join("\n");
+    let last_lf = if !note.ends_with("\n") { "\n" } else { "" };
 
     let note_draft_path = &PathBuf::from(format!("data/drafts/{note_num}-edit.draft.md"));
-
-    let last_lf = if !note.ends_with("\n") { "\n" } else { "" };
 
     std::fs::write(
         note_draft_path,
@@ -48,33 +49,23 @@ pub fn edit_note(n: usize) {
         }
     };
 
-    let note = helpers::strip_html_comments(&note);
-
-    let mut note_lines = Vec::new();
-    let mut is_empty_note = true;
-    for line in note.lines() {
-        if is_empty_note && !line.trim().is_empty() {
-            is_empty_note = false;
+    let note = match crate::create_note::note_from_draft(note) {
+        Some(v) => v,
+        None => {
+            std::fs::remove_file(note_draft_path)
+                .unwrap();
+            proc_exit(Err(String::from("Empty note, aborting.")));
         }
-        note_lines.push(line.trim_end());
-    }
+    };
 
-    if is_empty_note {
-        std::fs::remove_file(note_draft_path)
-            .unwrap();
-        proc_exit(Err(String::from("Empty note, aborting.")));
-    } else {
-        let note = note_lines.join("\n");
+    std::fs::write(
+        filename,
+        note
+    ).unwrap();
 
-        std::fs::write(
-            filename,
-            note
-        ).unwrap();
+    std::fs::remove_file(note_draft_path)
+        .unwrap();
 
-        std::fs::remove_file(note_draft_path)
-            .unwrap();
-
-        helpers::git_commit(&note_num, true);
-    }
+    helpers::git_commit(&note_num, true);
 }
 

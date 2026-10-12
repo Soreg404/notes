@@ -30,7 +30,11 @@ pub fn recreate_data_folder() {
 	}
 }
 
-pub fn get_counter() -> usize {
+pub fn get_counter_string() -> String {
+    format!("{:08}", get_counter())
+}
+
+fn get_counter() -> usize {
     use std::io::Seek;
     let mut counter_file = std::fs::OpenOptions::new()
         .read(true)

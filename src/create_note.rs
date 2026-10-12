@@ -33,6 +33,7 @@ pub fn create_note() {
     helpers::create_editor_proc(note_draft_path)
         .wait()
         .unwrap();
+
     let note = match std::fs::read_to_string(note_draft_path) {
         Ok(v) => v,
         Err(ioerr) => {
@@ -79,7 +80,7 @@ pub fn note_from_draft(mut note: String) -> Option<String> {
     let mut note = note_lines.join("\n");
 
     let date = chrono::Local::now().to_utc();
-    helpers::set_note_date(&mut note, date);
+    note = helpers::set_note_date(note, date);
 
     Some(note)
 }

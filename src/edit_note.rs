@@ -14,17 +14,16 @@ use chrono::{
 pub fn edit_note(note_num: &str) {
     let filename = &PathBuf::from(format!("data/objects-store/{note_num}.md"));
 
-    let note = match std::fs::read_to_string(filename) {
+    let mut note = match std::fs::read_to_string(filename) {
         Ok(v) => v,
         Err(ioerr) => {
             proc_exit(Err(format!("\x1b[91mnote missing!!\x1b[0m aborting (io error: {ioerr:?})")));
         }
     };
-    let note = helpers::patch_create_note_date_from_ftime(note, filename);
-    
-    let date = helpers::get_note_date(&note);
+    let date = helpers::get_strip_note_date(&mut note);
+
     let date_orig_str = DateTime::<FixedOffset>::from(date).to_rfc3339();
-    let edit_date = DateTime::<FixedOffset>::from(
+    let tmp_edit_date = DateTime::<FixedOffset>::from(
         chrono::Local::now().to_utc()).to_rfc3339();
 
     let last_lf = if !note.ends_with("\n") { "\n" } else { "" };
@@ -42,7 +41,7 @@ pub fn edit_note(note_num: &str) {
                 Empty note aborts operation.\n\
                 time:\n\
                   original: {date_orig_str}\n\
-                  edit:     {edit_date}\n\
+                  edit:     {tmp_edit_date}\n\
                 -->").as_bytes(),
     ).unwrap();
 

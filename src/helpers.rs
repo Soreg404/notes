@@ -9,31 +9,22 @@ use chrono::{
     Utc,
 };
 
-pub fn get_note_date(note: &str) -> DateTime<Utc> {
-    match note.lines().next()
-    .map(|v| DateTime::<Utc>::from_str(v)) {
-        Some(Ok(v)) => v.to_utc(),
+pub fn get_strip_note_date(note: &mut String) -> DateTime<Utc> {
+    let date_str = match note.lines().next() {
         None => panic!("\x1b[91mnote doesn't have date\x1b[0m"),
-        Some(Err(e)) => panic!("\x1b[91mnote has invalid date: {e:?}\x1b[0m"),
-    }
+        Some(v) => v,
+    };
+    let date = match DateTime::<Utc>::from_str(date_str) {
+        Err(e) => panic!("\x1b[91mnote has invalid date: {e:?}\x1b[0m"),
+        Ok(v) => v.to_utc(),
+    };
+    *note = note.lines().skip(1).collect();
+    date
 }
 
-pub fn set_note_date(note: &mut String, date: DateTime<Utc>) {
+pub fn set_note_date(note: String, date: DateTime<Utc>) -> String {
     let date_str = DateTime::<FixedOffset>::from(date).to_rfc3339();
-    *note = format!("{date_str}\n{note}");
-}
-
-/// todo: remove in next patch
-pub fn patch_create_note_date_from_ftime(
-    mut note: String,
-    p: &Path,
-) -> String {
-    let secs = std::fs::metadata(p).unwrap().modified().unwrap()
-        .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
-    let date = DateTime::<Utc>::from_timestamp_secs(
-        secs as i64).unwrap();
-    set_note_date(&mut note, date);
-    note
+    format!("{date_str}\n{note}")
 }
 
 pub fn get_note_title(note: &str) -> &str {

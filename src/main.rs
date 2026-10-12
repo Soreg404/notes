@@ -8,6 +8,8 @@ use crate::store::{get_notes_path};
 
 use chrono::{
     Utc,
+    DateTime,
+    FixedOffset,
 };
 
 mod config;
@@ -21,9 +23,13 @@ mod create_note;
 mod edit_note;
 
 fn main() {
+    #[allow(unused)]
     let conf = config::get_app_config();
 
     store::recreate_data_folder();
+
+    patch_rewrite_dates_to_note_objects();
+    #[expect(unreachable_code)]
 
     match conf.action {
         config::Action::Create => {
@@ -40,22 +46,18 @@ fn main() {
                 config::Action::Create => unreachable!(),
                 config::Action::Edit(_) => unreachable!(),
                 config::Action::List { slim } => {
-                    let d = read_dir(get_notes_path()).unwrap();
-
                     let mut note_paths = Vec::new();
-                    for p in d {
+                    for p in read_dir(get_notes_path()).unwrap() {
                         note_paths.push(p.unwrap());
                     }
 
                     for p in note_paths.iter().rev() {
                         let p = p.path();
-                        let note = std::fs::read_to_string(&p)
+                        let mut note = std::fs::read_to_string(&p)
                             .unwrap();
-                        let note = helpers::patch_create_note_date_from_ftime(note, &p);
                         let filename = p.file_name().unwrap().to_str().unwrap();
 
-
-                        let date = helpers::get_note_date(&note);
+                        let date = helpers::get_strip_note_date(&mut note);
                         let date_relative_str = helpers::date_relative_str(date);
 
                         if slim {
@@ -112,17 +114,14 @@ fn main() {
                     }
 
                     if proceed_show {
-                        let note = match std::fs::read_to_string(&filename){
+                        let mut note = match std::fs::read_to_string(&filename){
                             Err(ioerr) => {
                                 proc_exit(Err(format!("failed to read note {n}: {ioerr:?}")));
                             }
                             Ok(v) => v
                         };
 
-                        let date = helpers::get_note_date(&note);
-                        let note = helpers::patch_create_note_date_from_ftime(
-                            note, &filename);
-
+                        let date = helpers::get_strip_note_date(&mut note);
                         let date_relative_str = helpers::date_relative_str(date);
 
                         _ = writeln!(
@@ -173,4 +172,51 @@ fn create_pager_proc() -> std::process::Child {
         .stdin(std::process::Stdio::piped())
         .spawn()
         .unwrap()
+}
+
+fn patch_rewrite_dates_to_note_objects() -> ! {
+    use std::process::exit;
+
+    println!("\x1b[93mpatch: write filetime dates to all existing notes.\x1b[0m");
+    loop {
+        println!("continue? y/N");
+        let mut s = String::new();
+        std::io::stdin().read_line(&mut s).unwrap();
+        match s.trim() {
+            "y" | "Y" => {
+                println!("continue");
+                break;
+            }
+            "n" | "N" | "" => {
+                println!("cancel");
+                exit(1);
+            }
+            _ => continue
+        }
+    }
+    
+
+    for p in read_dir(get_notes_path()).unwrap() {
+        let p = &p.unwrap().path();
+        println!("doing path: {p:?}");
+        let secs = std::fs::metadata(p).unwrap().modified().unwrap()
+            .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+        let date = DateTime::<Utc>::from_timestamp_secs(
+            secs as i64).unwrap();
+
+        let mut note = match std::fs::read_to_string(p){
+            Err(ioerr) => {
+                eprintln!("failed to read note {p:?}: {ioerr:?}");
+                continue;
+            }
+            Ok(v) => v
+        };
+
+        note = helpers::set_note_date(note, date);
+        println!("  date: {}", DateTime::<FixedOffset>::from(date).to_rfc3339());
+
+        std::fs::write(p, note).unwrap();
+    }
+
+    exit(0)
 }

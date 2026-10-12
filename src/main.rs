@@ -4,9 +4,11 @@ use std::{
     io::Write,
     fs::read_dir,
 };
-use chrono::Utc;
-use chrono::DateTime;
 use crate::store::{get_notes_path};
+
+use chrono::{
+    Utc,
+};
 
 mod config;
 mod store;
@@ -28,7 +30,7 @@ fn main() {
             create_note::create_note();
         }
         config::Action::Edit(n) => {
-            edit_note::edit_note(n);
+            edit_note::edit_note(&format!("{:08}", n));
         }
         action => {
             let mut pager_proc = create_pager_proc();
@@ -49,12 +51,12 @@ fn main() {
                         let p = p.path();
                         let note = std::fs::read_to_string(&p)
                             .unwrap();
+                        let note = helpers::patch_create_note_date_from_ftime(note, &p);
                         let filename = p.file_name().unwrap().to_str().unwrap();
 
-                        helpers::patch_create_note_date_from_ftime(&mut note, filename);
 
-                        let date = helpers::get_note_date(&mut note);
-                        let date_relative_str = helpers::date_relative_str(&date);
+                        let date = helpers::get_note_date(&note);
+                        let date_relative_str = helpers::date_relative_str(date);
 
                         if slim {
                             let title = helpers::get_note_title(&note);
@@ -62,7 +64,7 @@ fn main() {
                             let num_days = -(Utc::now() - date).num_days();
                             _ = writeln!(pager_stdin, "{filename} {date_fmt} {num_days:4} \x1b[33m|\x1b[0m {title}");
                         } else {
-                            _ = writeln!(pager_stdin, "{filename} {} ({date_relative_str})", filedate.format("%Y-%m-%d %H:%M:%S"));
+                            _ = writeln!(pager_stdin, "{filename} {} ({date_relative_str})", date.format("%Y-%m-%d %H:%M:%S"));
                             let mut skip_first = true;
                             let mut n_empty_lines = 0;
                             let mut line_counter = 1;
@@ -110,20 +112,23 @@ fn main() {
                     }
 
                     if proceed_show {
-                        let note = match std::fs::read_to_string(filename){
+                        let note = match std::fs::read_to_string(&filename){
                             Err(ioerr) => {
                                 proc_exit(Err(format!("failed to read note {n}: {ioerr:?}")));
                             }
                             Ok(v) => v
                         };
 
-                        let date = helpers::get_note_date(&mut note);
-                        let date_relative_str = date_relative(&filedate);
+                        let date = helpers::get_note_date(&note);
+                        let note = helpers::patch_create_note_date_from_ftime(
+                            note, &filename);
+
+                        let date_relative_str = helpers::date_relative_str(date);
 
                         _ = writeln!(
                             pager_stdin,
                             "{note_name} {} ({date_relative_str})",
-                            filedate.format("%Y-%m-%d %H:%M:%S")
+                            date.format("%Y-%m-%d %H:%M:%S")
                         );
                         let mut skip_first = true;
                         let mut n_empty_lines = 0;

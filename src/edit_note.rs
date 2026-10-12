@@ -9,7 +9,6 @@ use crate::{
 use chrono::{
     DateTime,
     FixedOffset,
-    Utc,
 };
 
 pub fn edit_note(note_num: &str) {
@@ -21,7 +20,13 @@ pub fn edit_note(note_num: &str) {
             proc_exit(Err(format!("\x1b[91mnote missing!!\x1b[0m aborting (io error: {ioerr:?})")));
         }
     };
-    let note = note.lines().skip(1).join("\n");
+    let note = helpers::patch_create_note_date_from_ftime(note, filename);
+    
+    let date = helpers::get_note_date(&note);
+    let date_orig_str = DateTime::<FixedOffset>::from(date).to_rfc3339();
+    let edit_date = DateTime::<FixedOffset>::from(
+        chrono::Local::now().to_utc()).to_rfc3339();
+
     let last_lf = if !note.ends_with("\n") { "\n" } else { "" };
 
     let note_draft_path = &PathBuf::from(format!("data/drafts/{note_num}-edit.draft.md"));
@@ -32,10 +37,12 @@ pub fn edit_note(note_num: &str) {
             "{note}\
             {last_lf}\
             <!--\n\
-                Adding new note.\n\
+                Editing note #{note_num}.\n\
                 Comments are ignored and stripped.\n\
                 Empty note aborts operation.\n\
-                time: {t_fmt}\n\
+                time:\n\
+                  original: {date_orig_str}\n\
+                  edit:     {edit_date}\n\
                 -->").as_bytes(),
     ).unwrap();
 

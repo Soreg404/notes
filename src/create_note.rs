@@ -10,12 +10,11 @@ use crate::{
 use chrono::{
     DateTime,
     FixedOffset,
-    Utc,
     Local,
 };
 
 pub fn create_note() {
-    let note_num = store::get_counter();
+    let note_num = store::get_counter_string();
     let note_draft_path = &PathBuf::from(format!("data/drafts/{note_num}.draft.md"));
 
     let tmp_date = DateTime::<FixedOffset>::from(Local::now().to_utc()).to_rfc3339();
@@ -41,7 +40,7 @@ pub fn create_note() {
         }
     };
 
-    let note = match note_from_draft(&note) {
+    let note = match note_from_draft(note) {
         Some(v) => v,
         None => {
             std::fs::remove_file(note_draft_path)
@@ -62,8 +61,8 @@ pub fn create_note() {
     helpers::git_commit(&note_num, false);
 }
 
-pub fn note_from_draft(draft: &str) -> Option<String> {
-    let note = helpers::strip_html_comments(&note);
+pub fn note_from_draft(mut note: String) -> Option<String> {
+    let note = helpers::strip_html_comments(&mut note);
 
     let mut note_lines = Vec::new();
     let mut is_empty_note = true;
@@ -73,11 +72,11 @@ pub fn note_from_draft(draft: &str) -> Option<String> {
         }
         note_lines.push(line.trim_end());
     }
-    if is_empty {
+    if is_empty_note {
         return None;
     }
 
-    let note = note_lines.join("\n");
+    let mut note = note_lines.join("\n");
 
     let date = chrono::Local::now().to_utc();
     helpers::set_note_date(&mut note, date);

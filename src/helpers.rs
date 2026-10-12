@@ -1,4 +1,5 @@
 use std::{
+    str::FromStr,
     path::Path,
 };
 
@@ -8,41 +9,41 @@ use chrono::{
     Utc,
 };
 
-pub fn get_note_date(note: &mut String) -> DateTime<Utc> {
-    let panic_str = "";
-    match note.lines.next()
+pub fn get_note_date(note: &str) -> DateTime<Utc> {
+    match note.lines().next()
     .map(|v| DateTime::<Utc>::from_str(v)) {
         Some(Ok(v)) => v.to_utc(),
         None => panic!("\x1b[91mnote doesn't have date\x1b[0m"),
-        Err(e) => panic!("\x1b[91mnote has invalid date: {e:?}\x1b[0m"),
+        Some(Err(e)) => panic!("\x1b[91mnote has invalid date: {e:?}\x1b[0m"),
     }
 }
 
 pub fn set_note_date(note: &mut String, date: DateTime<Utc>) {
     let date_str = DateTime::<FixedOffset>::from(date).to_rfc3339();
-    note = format!("{date_str}\n{note}");
+    *note = format!("{date_str}\n{note}");
 }
 
+/// todo: remove in next patch
 pub fn patch_create_note_date_from_ftime(
+    mut note: String,
     p: &Path,
-    note: &mut String,
-) -> DateTime<Utc> {
+) -> String {
     let secs = std::fs::metadata(p).unwrap().modified().unwrap()
         .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
     let date = DateTime::<Utc>::from_timestamp_secs(
         secs as i64).unwrap();
-
-    set_note_date(note, date);
+    set_note_date(&mut note, date);
+    note
 }
 
 pub fn get_note_title(note: &str) -> &str {
     note.lines()
-        .skip(1).take(1)
+        .skip(1).take(1).next()
         .map(|v| v.trim())
-        .epxect("empty note is not allowed")
+        .expect("empty note is not allowed")
 }
 
-pub fn date_relative_str(datetime: &DateTime<Utc>) -> String {
+pub fn date_relative_str(datetime: DateTime<Utc>) -> String {
     let now = Utc::now();
     let time_diff = now - datetime;
     if time_diff.num_minutes() < 10 {

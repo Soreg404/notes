@@ -23,13 +23,13 @@ mod create_note;
 mod edit_note;
 
 fn main() {
-    #[allow(unused)]
     let conf = config::get_app_config();
 
     store::recreate_data_folder();
 
-    patch_rewrite_dates_to_note_objects();
-    #[expect(unreachable_code)]
+    if option_env!("PATCH_DATES").is_some() {
+        patch_rewrite_dates_to_note_objects();
+    }
 
     match conf.action {
         config::Action::Create => {

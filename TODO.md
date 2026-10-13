@@ -1,3 +1,6 @@
+# BREAKING BUG
+notki są w jednej lini po ostatnim patchu fuckkk
+
 # dodać backupy w zipie
 
 # możliwość edycji notek

@@ -9,6 +9,7 @@ use chrono::prelude::*;
 use crate::{
     store,
     prompt::prompt_yn,
+    helpers::get_strip_note_date
 };
 
 const CHECK_FILE: &str = "data/metadata/patch-dates-inobj";
@@ -42,7 +43,14 @@ pub fn patch() {
             Ok(v) => v
         };
 
-
+        match get_strip_note_date(&mut note) {
+            Ok(date) => {
+                println!("\x1b[90mnote has proper \
+                    date set: {date}\x1b[0m");
+                continue;
+            }
+            Err(_) => {}
+        }
 
         note = crate::helpers::set_note_date(note, date);
         println!("  date: {}", DateTime::<FixedOffset>::from(date).to_rfc3339());

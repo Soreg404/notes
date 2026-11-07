@@ -5,21 +5,23 @@ use std::{
 
 use chrono::prelude::*;
 
-pub fn get_strip_note_date(note: &mut String) -> DateTime<Utc> {
+pub fn get_strip_note_date(note: &mut String
+    ) -> Result<DateTime<Utc>, String> {
     let line1_len;
     let date_str = match note.lines().next() {
-        None => panic!("\x1b[91mnote doesn't have date\x1b[0m"),
+        None => return Err("note doesn't have date".to_string()),
         Some(v) => {
             line1_len = v.len();
             v
         },
     };
     let date = match DateTime::<Utc>::from_str(date_str) {
-        Err(e) => panic!("\x1b[91mnote has invalid date: {e:?}\x1b[0m"),
+        Err(e) => return Err(format!("note has invalid date: {e:?}")),
         Ok(v) => v.to_utc(),
     };
     *note = note.split_at(line1_len + 1).1.to_string();
-    date
+
+    Ok(date)
 }
 
 pub fn set_note_date(note: String, date: DateTime<Utc>) -> String {

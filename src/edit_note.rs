@@ -17,7 +17,9 @@ pub fn edit_note(note_num: &str) {
             proc_exit(Err(format!("\x1b[91mnote missing!!\x1b[0m aborting (io error: {ioerr:?})")));
         }
     };
-    let date = helpers::get_strip_note_date(&mut note);
+
+    let date = helpers::get_strip_note_date(&mut note)
+        .unwrap();
 
     let date_orig_str = DateTime::<FixedOffset>::from(date).to_rfc3339();
     let tmp_edit_date = DateTime::<FixedOffset>::from(

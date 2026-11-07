@@ -56,7 +56,8 @@ fn main() {
                             .unwrap();
                         let filename = p.file_name().unwrap().to_str().unwrap();
 
-                        let date = helpers::get_strip_note_date(&mut note);
+                        let date = helpers::get_strip_note_date(&mut note)
+                            .unwrap();
                         let date_local: DateTime<Local> = DateTime::from(date);
                         let date_relative_str = helpers::date_relative_str(date.to_utc());
 
@@ -128,7 +129,8 @@ fn main() {
                             Ok(v) => v
                         };
 
-                        let date = helpers::get_strip_note_date(&mut note);
+                        let date = helpers::get_strip_note_date(&mut note)
+                            .unwrap();
                         let date_relative_str = helpers::date_relative_str(date.to_utc());
 
                         _ = writeln!(

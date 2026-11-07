@@ -30,8 +30,8 @@ fn main() {
 
 
     match conf.action {
-        config::Action::Create => {
-            create_note::create_note();
+        config::Action::Create { create_template } => {
+            create_note::create_note(create_template);
         }
         config::Action::Edit(n) => {
             edit_note::edit_note(&format!("{:08}", n));
@@ -41,7 +41,7 @@ fn main() {
             let mut pager_stdin = pager_proc.stdin.take().unwrap();
 
             match action {
-                config::Action::Create => unreachable!(),
+                config::Action::Create {..} => unreachable!(),
                 config::Action::Edit(_) => unreachable!(),
                 config::Action::List { slim } => {
                     let mut note_paths = Vec::new();

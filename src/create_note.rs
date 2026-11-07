@@ -3,6 +3,7 @@ use std::{
 };
 use crate::{
     exit_process::proc_exit,
+    config::CreateTemplate,
     store,
     helpers,
 };
@@ -10,22 +11,41 @@ use crate::{
 use chrono::prelude::*;
 
     
-pub fn create_note() {
+pub fn create_note(create_template: CreateTemplate) {
     let note_num = store::get_counter_string();
     let note_draft_path = &PathBuf::from(format!("data/drafts/{note_num}.draft.md"));
 
     let tmp_date = DateTime::<FixedOffset>::from(Local::now().to_utc()).to_rfc3339();
 
-    std::fs::write(
-        note_draft_path,
-        format!("\n\n\
-            <!--\n\
+    match create_template {
+        CreateTemplate::Normal => {
+            std::fs::write(
+                note_draft_path,
+                format!("\n\n\
+                <!--\n\
                 Adding new note.\n\
                 Comments are ignored and stripped.\n\
                 Empty note aborts operation.\n\
                 time: {tmp_date}\n\
                 -->").as_bytes(),
-    ).unwrap();
+            ).unwrap();
+        }
+        CreateTemplate::Polecajka => {
+            std::fs::write(
+                note_draft_path,
+                format!("polecajka \n\
+                od \n\
+                kontekst \n\n\
+                #polecajka\n\
+                <!--\n\
+                POLECAJKA.\n\
+                Comments are ignored and stripped.\n\
+                Empty note aborts operation.\n\
+                time: {tmp_date}\n\
+                -->").as_bytes(),
+            ).unwrap();
+        }
+    }
 
     helpers::create_editor_proc(note_draft_path)
         .wait()

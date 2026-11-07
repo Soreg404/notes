@@ -5,7 +5,9 @@ pub struct AppConfig {
 }
 
 pub enum Action {
-    Create,
+    Create {
+        create_template: CreateTemplate
+    },
     List {
         slim: bool
     },
@@ -16,9 +18,16 @@ pub enum Action {
     Edit(usize),
 }
 
+pub enum CreateTemplate {
+    Normal,
+    Polecajka,
+}
+
 pub fn get_app_config() -> AppConfig {
     let mut conf = AppConfig {
-        action: Action::Create
+        action: Action::Create {
+            create_template: CreateTemplate::Normal,
+        }
     };
 
     let mut action_arg_set = false;
@@ -34,7 +43,14 @@ pub fn get_app_config() -> AppConfig {
         match arg {
             "--create" | "-c" => {
                 check_action_arg_set(arg);
-                conf.action = Action::Create;
+                conf.action = Action::Create {
+                    create_template: CreateTemplate::Normal
+                };
+            }
+            "--create=polecajka" => {
+                conf.action = Action::Create {
+                    create_template: CreateTemplate::Polecajka
+                };
             }
             "--list" | "-l" => {
                 check_action_arg_set(arg);

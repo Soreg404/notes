@@ -8,6 +8,7 @@ use chrono::prelude::*;
 
 use crate::{
     store,
+    prompt::prompt_yn,
 };
 
 const CHECK_FILE: &str = "data/metadata/patch-dates-inobj";
@@ -22,22 +23,8 @@ pub fn is_applied() -> bool {
 
 pub fn patch() {
     println!("\x1b[93mpatch: write filetime dates to all existing notes.\x1b[0m");
-    loop {
-        println!("continue? y/N");
-        let mut s = String::new();
-        std::io::stdin().read_line(&mut s).unwrap();
-        match s.trim() {
-            "y" | "Y" => {
-                println!("continue");
-                break;
-            }
-            "n" | "N" | "" => {
-                println!("cancel");
-                exit(1);
-            }
-            _ => continue
-        }
-    }
+
+    if !prompt_yn() { exit(1); };
 
     for p in read_dir(store::notes_path()).unwrap() {
         let p = &p.unwrap().path();
@@ -54,6 +41,8 @@ pub fn patch() {
             }
             Ok(v) => v
         };
+
+
 
         note = crate::helpers::set_note_date(note, date);
         println!("  date: {}", DateTime::<FixedOffset>::from(date).to_rfc3339());

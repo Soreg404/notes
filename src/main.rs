@@ -16,6 +16,8 @@ mod exit_process;
 use exit_process::proc_exit;
 
 mod helpers;
+mod prompt;
+
 mod create_note;
 mod edit_note;
 
@@ -27,7 +29,6 @@ fn main() {
     store::recreate_data_folder();
 
     check_version();
-
 
     match conf.action {
         config::Action::Create { create_template } => {
